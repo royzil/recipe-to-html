@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Recipe to HTML Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background: #fff8f4;
+      color: #5d4037;
+      font-family: 'Quicksand', Arial, sans-serif;
+      padding: 1.5rem;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      font-family: 'Pacifico', cursive;
+      color: #f7b267;
+      margin-bottom: 1.2rem;
+    }
+    label {
+      font-weight: 600;
+      margin-top: 1.3em;
+      display: block;
+    }
+    textarea, pre {
+      width: 100%;
+      min-height: 140px;
+      font-family: 'Fira Mono', monospace, monospace;
+      font-size: 1rem;
+      margin-bottom: 1em;
+      border-radius: 12px;
+      border: 1px solid #ffe0b2;
+      padding: 0.7em;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    pre {
+      background: #fff3e0;
+      border: 1px solid #f7b267;
+      min-height: 90px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 0;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 0.8em;
+      background: #f7b267;
+      color: #5d4037;
+      font-size: 1.15em;
+      font-weight: bold;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(255,152,0,0.08);
+      margin-bottom: 1.3em;
+      transition: background .16s;
+    }
+    button:active { background: #ffa726; }
+    .note {
+      background: #fff9e6;
+      border-left: 4px solid #f7b267;
+      padding: 0.8em;
+      font-size: 0.99em;
+      margin-bottom: 1.2em;
+      border-radius: 8px;
+    }
+    .copied {
+      color: #388e3c;
+      font-weight: 600;
+      margin-bottom: 1em;
+      display: block;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=Pacifico&display=swap" rel="stylesheet">
+</head>
+<body>
+  <h1>Recipe to HTML</h1>
+  <div class="note">
+    Paste your recipe in this format:<br>
+    <pre>Recipe Name: Cinnamon Rolls
+Prep Time: 30 min
+Bake/Cook Time: 25 min
+Other Notes: Rise: 1h
+
+Ingredients:
+- 2 cups flour
+- 1/4 cup sugar
+
+Instructions:
+1. Mix ingredients.
+2. Let rise.
+3. Bake.</pre>
+  </div>
+
+  <label for="plain">Plain Text Recipe</label>
+  <textarea id="plain" placeholder="Paste your plain text recipe here"></textarea>
+
+  <button id="convert">Convert to HTML</button>
+  <span class="copied" id="copied" style="display:none;">Copied!</span>
+
+  <label for="html">HTML Output</label>
+  <pre id="html" contenteditable="true" readonly></pre>
+  <button id="copy">Copy HTML</button>
+
+  <script>
+    function makeId(str) {
+      return str
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+    function escapeHtml(str) {
+      return str.replace(/[&<>"]/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])
+      );
+    }
+    function parseRecipe(txt) {
+      const name = (txt.match(/Recipe Name:\s*(.*)/i)||[])[1]||'';
+      const prep = (txt.match(/Prep Time:\s*(.*)/i)||[])[1]||'';
+      const bake = (txt.match(/Bake\/Cook Time:\s*(.*)/i)||[])[1]||'';
+      const notes = (txt.match(/Other Notes:\s*(.*)/i)||[])[1]||'';
+      const ingMatch = txt.match(/Ingredients:\s*([\s\S]*?)\n\s*Instructions:/i);
+      const ingredients = ingMatch ? ingMatch[1]
+        .split('\n').map(l=>l.trim()).filter(l=>l.startsWith('-')).map(l=>l.replace(/^- /,'').trim()) : [];
+      const instMatch = txt.match(/Instructions:\s*([\s\S]*)/i);
+      const instructions = instMatch ? instMatch[1]
+        .split('\n').map(l=>l.trim()).filter(l=>/^\d+\./.test(l)).map(l=>l.replace(/^\d+\.\s*/,'').trim()) : [];
+      return {name, prep, bake, notes, ingredients, instructions};
+    }
+    function recipeToHtml(r) {
+      let meta = [];
+      if(r.prep) meta.push(`Prep: ${escapeHtml(r.prep)}`);
+      if(r.bake) meta.push(`Bake: ${escapeHtml(r.bake)}`);
+      if(r.notes) meta.push(escapeHtml(r.notes));
+      return `<section class="recipe" id="${makeId(r.name)}">
+  <h2>${escapeHtml(r.name)}</h2>
+  <div class="meta">${meta.join(' &middot; ')}</div>
+  <div class="ingredients">
+    <strong>Ingredients:</strong>
+    <ul>
+${r.ingredients.map(i=>`      <li>${escapeHtml(i)}</li>`).join('\n')}
+    </ul>
+  </div>
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+${r.instructions.map(i=>`      <li>${escapeHtml(i)}</li>`).join('\n')}
+    </ol>
+  </div>
+  <a href="#top" class="back-to-top">Back to Top ↑</a>
+</section>`;
+    }
+    document.getElementById('convert').onclick = function() {
+      const txt = document.getElementById('plain').value;
+      const r = parseRecipe(txt);
+      if(!r.name || r.ingredients.length===0 || r.instructions.length===0) {
+        document.getElementById('html').textContent = 'Please check your recipe format!';
+        return;
+      }
+      document.getElementById('html').textContent = recipeToHtml(r);
+    };
+    document.getElementById('copy').onclick = function() {
+      const html = document.getElementById('html').textContent;
+      if(html.trim()) {
+        navigator.clipboard.writeText(html).then(()=>{
+          document.getElementById('copied').style.display='inline';
+          setTimeout(()=>{document.getElementById('copied').style.display='none';},1500);
+        });
+      }
+    };
+  </script>
+</body>
+  </html>
